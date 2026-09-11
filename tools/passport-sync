@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# macOS login agent + Raycast control for Codex Passport BLE sync.
+set -euo pipefail
+
+LABEL="local.codex-passport-sync"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ASSISTANT="$SCRIPT_DIR/assistant.py"
+HOME_DIR="${CODEX_PASSPORT_HOME:-$HOME/.codex-passport}"
+VENV="$HOME_DIR/venv"
+PYTHON="$VENV/bin/python"
+PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+LOG="$HOME_DIR/sync.log"
+INTERVAL="${CODEX_PASSPORT_INTERVAL:-60}"
+UID_NUM="$(id -u)"
+DOMAIN="gui/${UID_NUM}"
+TARGET="${DOMAIN}/${LABEL}"
+
+usage() {
+  echo "Usage: $0 {install|uninstall|start|stop|restart|status|logs}" >&2
+  echo "  install    Create ~/.codex-passport venv, login agent, and start it" >&2
+  echo "  uninstall  Stop the agent and remove the login item" >&2
+  echo "  start      Start (installs first if needed)" >&2
+  echo "  stop       Stop until the next start or login" >&2
+  echo "  restart    Restart the running agent" >&2
+  echo "  status     Print running/stopped, pid, and log path" >&2
+  echo "  logs       Print the last 80 log lines" >&2
+}
+
+die() {
+  echo "$1" >&2
+  exit 1
+}
+
+loaded() {
+  launchctl print "$TARGET" >/dev/null 2>&1
+}
+
+agent_pid() {
+  local out
+  out="$(launchctl print "$TARGET" 2>/dev/null || true)"
+  printf '%s\n' "$out" | awk '/^[[:space:]]+pid = [1-9]/ { print $3; exit }'
+}
+
+kick() {
+  launchctl kickstart -k "$TARGET" >/dev/null 2>&1 || launchctl kickstart "$TARGET"
+  local i pid
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    pid="$(agent_pid)"
+    if [[ -n "$pid" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+}
+
+ensure_python() {
+  command -v python3 >/dev/null 2>&1 || die "python3 not found. Install Python 3, then retry."
+}
+
+ensure_venv() {
+  mkdir -p "$HOME_DIR"
+  if [[ -x "$PYTHON" ]] && "$PYTHON" -c "import bleak" 2>/dev/null; then
+    return 0
+  fi
+  ensure_python
+  if [[ ! -x "$PYTHON" ]]; then
+    python3 -m venv "$VENV"
+  fi
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q bleak
+  "$PYTHON" -c "import bleak" 2>/dev/null || die "Failed to install bleak into $VENV"
+}
+
+write_plist() {
+  mkdir -p "$(dirname "$PLIST")" "$HOME_DIR"
+  cat >"$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${PYTHON}</string>
+    <string>${ASSISTANT}</string>
+    <string>--sync</string>
+    <string>--interval</string>
+    <string>${INTERVAL}</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>${SCRIPT_DIR}</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>${LOG}</string>
+  <key>StandardErrorPath</key>
+  <string>${LOG}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+    <key>PYTHONIOENCODING</key>
+    <string>UTF-8</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>
+EOF
+}
+
+bootout() {
+  if loaded; then
+    launchctl bootout "$TARGET" >/dev/null 2>&1 || true
+  fi
+}
+
+bootstrap() {
+  launchctl bootstrap "$DOMAIN" "$PLIST"
+}
+
+cmd_install() {
+  [[ -f "$ASSISTANT" ]] || die "Missing $ASSISTANT"
+  ensure_venv
+  write_plist
+  bootout
+  bootstrap
+  kick
+  echo "Installed login agent ${LABEL} (pid $(agent_pid))"
+  echo "Log: ${LOG}"
+  echo "Raycast: Settings → Extensions → Script Commands → Add Directories →"
+  echo "  ${SCRIPT_DIR}/raycast"
+}
+
+cmd_uninstall() {
+  bootout
+  rm -f "$PLIST"
+  echo "Removed login agent ${LABEL}"
+}
+
+cmd_start() {
+  if [[ ! -f "$PLIST" ]]; then
+    cmd_install
+    return 0
+  fi
+  ensure_venv
+  write_plist
+  if ! loaded; then
+    bootstrap
+  fi
+  kick
+  echo "Started ${LABEL} (pid $(agent_pid))"
+}
+
+cmd_stop() {
+  if ! loaded; then
+    echo "Stopped ${LABEL} (already stopped)"
+    return 0
+  fi
+  bootout
+  echo "Stopped ${LABEL}"
+}
+
+cmd_restart() {
+  if [[ ! -f "$PLIST" ]]; then
+    cmd_install
+    return 0
+  fi
+  cmd_start
+}
+
+cmd_status() {
+  local pid
+  pid="$(agent_pid)"
+  if [[ -n "$pid" ]]; then
+    echo "running  pid=${pid}  log=${LOG}"
+  elif loaded || [[ -f "$PLIST" ]]; then
+    echo "stopped  log=${LOG}"
+    exit 1
+  else
+    echo "not installed"
+    exit 1
+  fi
+}
+
+cmd_logs() {
+  [[ -f "$LOG" ]] || die "No log yet: $LOG"
+  tail -n 80 "$LOG"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  install) cmd_install ;;
+  uninstall) cmd_uninstall ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  status) cmd_status ;;
+  logs) cmd_logs ;;
+  -h|--help|help|"") usage; [[ -n "$cmd" ]] || exit 1 ;;
+  *) usage; die "Unknown command: $cmd" ;;
+esac

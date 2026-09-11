@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Passport</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0B1018;
+      --navy: #121A2A;
+      --well: #171F30;
+      --hair: #2C3850;
+      --ivory: #F4EFE4;
+      --ivory-dim: #C4BDB0;
+      --muted: #8A93A6;
+      --gold: #D4B45A;
+      --gold-deep: #A68532;
+      --burgundy: #8E2433;
+      --spine-top: #A32E3F;
+      --spine-bot: #5C1520;
+      --wait: #E8A54B;
+      --done: #3D9B8F;
+      --err: #D4524A;
+      --idle: #6B7385;
+      --heat-0: #1A2233;
+      --heat-1: #3D3420;
+      --heat-2: #6E5A28;
+      --heat-3: #A68532;
+      --heat-4: #E0C56A;
+      --studio: #161310;
+      --studio-2: #241F1A;
+      --bezel: #1A1A1C;
+      --screen: 240px;
+      --screen-h: 320px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, #2A2218 0%, transparent 55%),
+        var(--studio);
+      color: var(--ivory);
+      min-height: 100dvh;
+    }
+
+    .studio {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 36px 28px 64px;
+      display: grid;
+      grid-template-columns: minmax(320px, 620px) minmax(280px, 1fr);
+      gap: 40px;
+      align-items: start;
+    }
+
+    .stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+    .device {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .bezel {
+      background: linear-gradient(160deg, #2A2A2E, var(--bezel) 40%, #111113);
+      border-radius: 18px;
+      padding: 14px 12px 18px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.06) inset,
+        0 24px 60px rgba(0,0,0,.45);
+    }
+
+    .lcd-frame {
+      background: #05070C;
+      padding: 4px;
+      border-radius: 4px;
+      box-shadow: 0 0 0 1px #000;
+    }
+
+    .screen-scale {
+      width: var(--screen);
+      height: var(--screen-h);
+      transform-origin: top left;
+    }
+
+    .screen {
+      width: 240px;
+      height: 320px;
+      background: var(--ink);
+      color: var(--ivory);
+      display: flex;
+      overflow: hidden;
+      font-feature-settings: "ss01", "tnum";
+      user-select: none;
+    }
+
+    .spine {
+      width: 6px;
+      flex: none;
+      background: linear-gradient(180deg, var(--spine-top), var(--spine-bot));
+      box-shadow: 1px 0 0 rgba(212,180,90,.25);
+    }
+
+    .col {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status {
+      height: 22px;
+      flex: none;
+      display: grid;
+      grid-template-columns: 28px 1fr 46px;
+      align-items: center;
+      padding: 0 8px 0 6px;
+      background: #0E1420;
+      border-bottom: 1px solid #1C2536;
+    }
+
+    .ble {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      color: var(--gold);
+    }
+    .ble.off { color: var(--idle); }
+    .ble svg { display: block; }
+
+    .stamp {
+      justify-self: center;
+      min-width: 44px;
+      height: 14px;
+      padding: 0 6px;
+      border: 1px solid currentColor;
+      border-radius: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 8px;
+      letter-spacing: .16em;
+      font-weight: 500;
+      color: var(--idle);
+    }
+    .stamp.run { color: var(--gold); background: rgba(212,180,90,.12); }
+    .stamp.wait { color: var(--wait); background: rgba(232,165,75,.12); }
+    .stamp.done { color: var(--done); background: rgba(61,155,143,.12); }
+    .stamp.err { color: var(--err); background: rgba(212,82,74,.12); }
+    .stamp.run .txt { animation: pulse 1.6s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .45; }
+    }
+
+    .batt {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--ivory-dim);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 8px;
+      letter-spacing: .04em;
+    }
+    .batt-shell {
+      width: 16px;
+      height: 8px;
+      border: 1px solid currentColor;
+      border-radius: 1px;
+      position: relative;
+      padding: 1px;
+    }
+    .batt-shell::after {
+      content: "";
+      position: absolute;
+      right: -2px;
+      top: 2px;
+      width: 1px;
+      height: 4px;
+      background: currentColor;
+    }
+    .batt-level { height: 100%; background: var(--done); }
+    .batt.low .batt-level { background: var(--err); }
+    .batt.chg .batt-level { background: var(--gold); }
+
+    .live {
+      display: none;
+      height: 16px;
+      flex: none;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      background: #15110A;
+      border-bottom: 1px solid rgba(212,180,90,.28);
+      color: var(--gold);
+      font-size: 9px;
+      letter-spacing: .04em;
+    }
+    .live.on { display: flex; }
+    .live .dot {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--gold);
+    }
+    .live.run .dot { animation: pulse 1.2s ease-in-out infinite; }
+    .live .proj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live .meta { font-family: "IBM Plex Mono", monospace; font-size: 8px; color: var(--ivory-dim); }
+
+    .pages { flex: 1; position: relative; min-height: 0; }
+    .page {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      padding: 8px 8px 0 8px;
+    }
+    .page.on { display: flex; }
+
+    .pager {
+      height: 16px;
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      background: #0E1420;
+    }
+    .tick {
+      width: 10px;
+      height: 2px;
+      background: #2A3346;
+    }
+    .tick.on { background: var(--gold); width: 16px; }
+
+    .kicker {
+      font-size: 8px;
+      letter-spacing: .22em;
+      color: var(--gold);
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .micro {
+      font-size: 8px;
+      letter-spacing: .16em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .hair { height: 1px; background: var(--hair); margin: 6px 0; }
+
+    /* Home */
+    .page-home {
+      padding: 12px 12px 0;
+    }
+    .home-id {
+      flex: none;
+    }
+    .who {
+      margin-top: 8px;
+      font-family: "Fraunces", serif;
+      font-optical-sizing: auto;
+      font-weight: 650;
+      font-size: 34px;
+      line-height: .95;
+      color: var(--ivory);
+      letter-spacing: -.02em;
+    }
+    .motto {
+      margin-top: 10px;
+      max-width: 22ch;
+      font-family: "Fraunces", serif;
+      font-size: 13px;
+      font-style: italic;
+      font-weight: 500;
+      line-height: 1.35;
+      color: var(--ivory-dim);
+    }
+    .home-today {
+      margin: auto -12px 0;
+      padding: 14px 12px 16px;
+      background: #100E0A;
+      border-top: 1px dashed rgba(212,180,90,.4);
+    }
+    .home-today-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .home-today-num {
+      margin-top: 4px;
+      font-family: "Fraunces", serif;
+      font-weight: 650;
+      font-size: 52px;
+      line-height: .88;
+      letter-spacing: -.04em;
+      color: var(--ivory);
+    }
+    .home-today-unit {
+      margin-top: 4px;
+      font-size: 10px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    /* Mileage */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 4px 2px 10px;
+    }
+    .hero .unit {
+      font-size: 10px;
+      letter-spacing: .2em;
+      color: var(--gold);
+      margin-top: 2px;
+    }
+    .hero-num {
+      font-family: "Fraunces", serif;
+      font-weight: 650;
+      font-size: 44px;
+      line-height: .92;
+      letter-spacing: -.03em;
+      color: var(--ivory);
+    }
+    .strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-top: 1px solid var(--hair);
+      margin: 0 -8px;
+    }
+    .stat {
+      padding: 8px 6px 10px;
+      border-right: 1px solid var(--hair);
+    }
+    .stat:last-child { border-right: 0; }
+    .stat b {
+      display: block;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ivory);
+      margin-top: 3px;
+    }
+
+    /* Heatmap */
+    .heat-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .heat-wrap {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 10px 1fr;
+      gap: 4px;
+      align-items: start;
+    }
+    .dows {
+      display: grid;
+      grid-template-rows: repeat(7, 14px);
+      gap: 1px;
+      color: var(--muted);
+      font-size: 7px;
+      line-height: 14px;
+      text-align: center;
+    }
+    .grid91 {
+      display: grid;
+      grid-template-columns: repeat(13, 14px);
+      grid-template-rows: repeat(7, 14px);
+      gap: 1px;
+    }
+    .cell { width: 14px; height: 14px; background: var(--heat-0); }
+    .cell.l1 { background: var(--heat-1); }
+    .cell.l2 { background: var(--heat-2); }
+    .cell.l3 { background: var(--heat-3); }
+    .cell.l4 { background: var(--heat-4); }
+    .legend {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 8px;
+      letter-spacing: .08em;
+    }
+    .legend i {
+      display: block; width: 8px; height: 8px;
+    }
+    .heat-sum {
+      margin-top: auto;
+      padding: 8px 0 6px;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--hair);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      color: var(--ivory-dim);
+    }
+    .heat-sum strong { color: var(--gold); font-weight: 500; }
+
+    /* Directions */
+    .rank { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .row {
+      display: grid;
+      grid-template-columns: 16px 1fr;
+      gap: 8px;
+      align-items: start;
+    }
+    .num {
+      font-family: "Fraunces", serif;
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--gold);
+      line-height: 1;
+      padding-top: 1px;
+    }
+    .row .name {
+      font-size: 12px;
+      color: var(--ivory);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row .meta {
+      display: flex;
+      justify-content: space-between;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 9px;
+      color: var(--muted);
+      margin: 3px 0 4px;
+    }
+    .bar {
+      height: 4px;
+      background: #1E2738;
+      position: relative;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      background: var(--gold);
+    }
+    .bar.r2 > i { background: var(--gold-deep); width: 24%; }
+    .bar.r3 > i { background: #6E5A28; width: 14%; }
+
+    /* QR */
+    .qr-page {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 10px;
+    }
+    .qr-well {
+      width: 156px;
+      height: 156px;
+      background: #F4EFE4;
+      padding: 8px;
+      box-shadow: 0 0 0 1px var(--gold-deep);
+    }
+    .qr-well svg { display: block; width: 140px; height: 140px; }
+    .qr-url {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 9px;
+      color: var(--ivory-dim);
+      letter-spacing: .02em;
+    }
+
+    /* Hardware keys */
+    .keys {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      padding: 28px 0;
+    }
+    .key {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #3A3834;
+      background: radial-gradient(circle at 35% 30%, #3A3836, #1C1B19);
+      color: #C4BDB0;
+      font-size: 9px;
+      letter-spacing: .08em;
+      cursor: pointer;
+      box-shadow: 0 2px 0 #0A0A0A;
+    }
+    .key:hover { color: var(--gold); border-color: #5A5040; }
+    .key:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+    .key:active { transform: translateY(1px); box-shadow: none; }
+    .key.ok { width: 40px; height: 40px; color: var(--gold); }
+
+    .hint {
+      font-size: 12px;
+      color: #8A8276;
+      letter-spacing: .04em;
+    }
+    .hint kbd {
+      display: inline-block;
+      border: 1px solid #3A3834;
+      padding: 1px 6px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      color: #C4BDB0;
+    }
+
+    .copy h1 {
+      font-family: "Fraunces", "Noto Serif SC", serif;
+      font-weight: 650;
+      font-size: 32px;
+      letter-spacing: -.02em;
+    }
+    .copy .lede {
+      margin-top: 10px;
+      color: #C4BDB0;
+      font-size: 15px;
+      line-height: 1.55;
+      max-width: 42em;
+    }
+    .copy dl {
+      margin-top: 28px;
+      display: grid;
+      gap: 16px;
+    }
+    .copy dt {
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 4px;
+    }
+    .copy dd {
+      color: #C4BDB0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .controls {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip-btn {
+      appearance: none;
+      border: 1px solid #3A3834;
+      background: transparent;
+      color: #C4BDB0;
+      font: inherit;
+      font-size: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .chip-btn.on, .chip-btn:hover { border-color: var(--gold); color: var(--ivory); }
+    .chip-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+    @media (max-width: 860px) {
+      .studio { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stamp.run .txt, .live.run .dot { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="studio">
+    <div class="stage">
+      <div class="device">
+        <div class="bezel">
+          <div class="lcd-frame">
+            <div class="screen-scale" id="scaleBox">
+              <div class="screen" role="img" aria-label="Codex Passport 屏幕">
+                <div class="spine" aria-hidden="true"></div>
+                <div class="col">
+                  <div class="status">
+                    <div class="ble" id="ble" title="蓝牙已连接">
+                      <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
+                        <path d="M5 1 L5 11 M5 1 L8.5 3.5 L2 8 M5 11 L8.5 8.5 L2 4" fill="none" stroke="currentColor" stroke-width="1.1"/>
+                      </svg>
+                    </div>
+                    <div class="stamp" id="stamp"><span class="txt">IDLE</span></div>
+                    <div class="batt chg" title="电量 87%，充电中">
+                      <span>87</span>
+                      <div class="batt-shell"><div class="batt-level" style="width:87%"></div></div>
+                    </div>
+                  </div>
+                  <div class="live" id="live">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="proj" id="liveProj">ai-passport</span>
+                    <span class="meta" id="liveMeta">04:12 · 128K</span>
+                  </div>
+                  <div class="pages">
+                    <section class="page page-home on" data-page="0" aria-label="资料">
+                      <div class="home-id">
+                        <div class="kicker">Codex</div>
+                        <div class="who">GuanMo</div>
+                        <p class="motto">In me the tiger sniffs the rose.</p>
+                      </div>
+                      <div class="home-today">
+                        <div class="home-today-meta">
+                          <span class="kicker">Today</span>
+                          <span class="micro">08 SEP 26</span>
+                        </div>
+                        <div class="home-today-num">63.0</div>
+                        <div class="home-today-unit">M tokens</div>
+                      </div>
+                    </section>
+
+                    <section class="page" data-page="1" aria-label="里程">
+                      <div class="kicker">Mileage</div>
+                      <div class="micro" style="margin-top:3px">Lifetime tokens</div>
+                      <div class="hero">
+                        <div class="hero-num">665.6</div>
+                        <div class="unit">MILLION</div>
+                      </div>
+                      <div class="strip">
+                        <div class="stat">
+                          <div class="micro">Today</div>
+                          <b>63.0M</b>
+                        </div>
+                        <div class="stat">
+                          <div class="micro">Week</div>
+                          <b>105M</b>
+                        </div>
+                        <div class="stat">
+                          <div class="micro">Streak</div>
+                          <b>2 days</b>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="page" data-page="2" aria-label="热力">
+                      <div class="heat-head">
+                        <div>
+                          <div class="kicker">Activity</div>
+                          <div class="micro" style="margin-top:3px">13 weeks</div>
+                        </div>
+                        <div class="micro">91 days</div>
+                      </div>
+                      <div class="heat-wrap">
+                        <div class="dows" aria-hidden="true">
+                          <span>日</span><span></span><span>二</span><span></span><span>四</span><span></span><span>六</span>
+                        </div>
+                        <div class="grid91" id="heat" role="img" aria-label="近 13 周每日 Token 活跃度，24 天有记录，峰值 285.1M"></div>
+                      </div>
+                      <div class="legend" aria-hidden="true">
+                        低
+                        <i style="background:var(--heat-0)"></i>
+                        <i style="background:var(--heat-1)"></i>
+                        <i style="background:var(--heat-2)"></i>
+                        <i style="background:var(--heat-3)"></i>
+                        <i style="background:var(--heat-4)"></i>
+                        高
+                      </div>
+                      <div class="heat-sum">
+                        <span>活跃 <strong>24 / 91</strong></span>
+                        <span>峰值 <strong>285.1M</strong></span>
+                      </div>
+                    </section>
+
+                    <section class="page" data-page="3" aria-label="方向">
+                      <div class="kicker">Directions</div>
+                      <div class="micro" style="margin-top:3px">Last 30 days</div>
+                      <div class="rank">
+                        <div class="row">
+                          <div class="num">1</div>
+                          <div>
+                            <div class="name">ai-passport</div>
+                            <div class="meta"><span>41.2M</span><span>62%</span></div>
+                            <div class="bar"><i style="width:62%"></i></div>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="num">2</div>
+                          <div>
+                            <div class="name">hanzi-cards</div>
+                            <div class="meta"><span>15.9M</span><span>24%</span></div>
+                            <div class="bar r2"><i></i></div>
+                          </div>
+                        </div>
+                        <div class="row">
+                          <div class="num">3</div>
+                          <div>
+                            <div class="name">xiaozhi-deepseek</div>
+                            <div class="meta"><span>9.3M</span><span>14%</span></div>
+                            <div class="bar r3"><i></i></div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="page qr-page" data-page="4" aria-label="主页二维码">
+                      <div class="kicker">Homepage</div>
+                      <div class="qr-well" id="qr"></div>
+                      <div class="qr-url">github.com/Ljhhhhhh</div>
+                    </section>
+                  </div>
+                  <div class="pager" id="pager" aria-hidden="true">
+                    <span class="tick on"></span>
+                    <span class="tick"></span>
+                    <span class="tick"></span>
+                    <span class="tick"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="keys">
+          <button class="key" type="button" id="btnUp" aria-label="上一页">UP</button>
+          <button class="key ok" type="button" id="btnOk" aria-label="打开或关闭二维码">OK</button>
+          <button class="key" type="button" id="btnDn" aria-label="下一页">DN</button>
+        </div>
+      </div>
+      <p class="hint">画布 240 × 320 · <kbd>↑</kbd> <kbd>↓</kbd> 翻页 · <kbd>Enter</kbd> 二维码</p>
+    </div>
+
+    <aside class="copy">
+      <h1>一本证件，四页。</h1>
+      <p class="lede">首页上半是人，下半是今天。虚线像票根撕开：签名铺开，用量打断。金箔只留单位，数字用象牙色压满。</p>
+      <dl>
+        <div>
+          <dt>资料</dt>
+          <dd>上半姓名与诗句，下半今日 Token。虚线分开人和用量。</dd>
+        </div>
+        <div>
+          <dt>里程</dt>
+          <dd>终身 Token 是这一页的“照片”。今日 / 本周 / 连续天数收成底栏三格。</dd>
+        </div>
+        <div>
+          <dt>热力</dt>
+          <dd>13×7 金箔五档。图下用数字写活跃天数和峰值。</dd>
+        </div>
+        <div>
+          <dt>方向</dt>
+          <dd>最近 30 天 Token 最多的三个项目，名次加比例条。上下键只翻页，OK 只开关二维码。</dd>
+        </div>
+      </dl>
+      <div class="controls" role="group" aria-label="预览控制">
+        <button class="chip-btn on" type="button" data-scale="2">2× 查看</button>
+        <button class="chip-btn" type="button" data-scale="1">1× 实尺</button>
+        <button class="chip-btn on" type="button" data-state="IDLE">空闲</button>
+        <button class="chip-btn" type="button" data-state="RUN">运行</button>
+        <button class="chip-btn" type="button" data-state="WAIT">等待</button>
+        <button class="chip-btn" type="button" data-state="DONE">完成</button>
+        <button class="chip-btn" type="button" data-state="ERR">异常</button>
+      </div>
+    </aside>
+  </div>
+  <script>
+    const pages = [...document.querySelectorAll(".page")];
+    const ticks = [...document.querySelectorAll(".tick")];
+    const stamp = document.getElementById("stamp");
+    const live = document.getElementById("live");
+    const scaleBox = document.getElementById("scaleBox");
+    const heat = document.getElementById("heat");
+    const pager = document.getElementById("pager");
+    let page = 0;
+    let qr = false;
+    let scale = 2;
+
+    function applyScale() {
+      scaleBox.style.transform = scale === 1 ? "none" : "scale(2)";
+      scaleBox.style.width = scale === 1 ? "240px" : "480px";
+      scaleBox.style.height = scale === 1 ? "320px" : "640px";
+    }
+    applyScale();
+
+    function show() {
+      const idx = qr ? 4 : page;
+      pages.forEach((p, i) => p.classList.toggle("on", i === idx));
+      ticks.forEach((t, i) => t.classList.toggle("on", !qr && i === page));
+      pager.style.visibility = qr ? "hidden" : "visible";
+    }
+
+    function up() {
+      if (qr) { qr = false; show(); return; }
+      page = (page + 3) % 4;
+      show();
+    }
+    function down() {
+      if (qr) { qr = false; show(); return; }
+      page = (page + 1) % 4;
+      show();
+    }
+    function ok() { qr = !qr; show(); }
+
+    document.getElementById("btnUp").addEventListener("click", up);
+    document.getElementById("btnDn").addEventListener("click", down);
+    document.getElementById("btnOk").addEventListener("click", ok);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") { e.preventDefault(); up(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); down(); }
+      if (e.key === "Enter") { e.preventDefault(); ok(); }
+    });
+
+    document.querySelectorAll("[data-scale]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        scale = Number(btn.dataset.scale);
+        document.querySelectorAll("[data-scale]").forEach((b) => b.classList.toggle("on", b === btn));
+        applyScale();
+      });
+    });
+
+    const stateMap = {
+      IDLE: { label: "IDLE", live: false },
+      RUN:  { label: "RUN",  live: true, cls: "run", proj: "ai-passport", meta: "04:12 · 128K" },
+      WAIT: { label: "WAIT", live: true, cls: "wait", proj: "hanzi-cards", meta: "waiting" },
+      DONE: { label: "DONE", live: true, cls: "done", proj: "ai-passport", meta: "turn 1.2M" },
+      ERR:  { label: "ERR",  live: true, cls: "err", proj: "xiaozhi", meta: "tool fail" }
+    };
+    document.querySelectorAll("[data-state]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-state]").forEach((b) => b.classList.toggle("on", b === btn));
+        const s = stateMap[btn.dataset.state];
+        stamp.className = "stamp" + (s.cls ? " " + s.cls : "");
+        stamp.innerHTML = '<span class="txt">' + s.label + "</span>";
+        live.className = "live" + (s.live ? " on" + (s.cls ? " " + s.cls : "") : "");
+        if (s.live) {
+          document.getElementById("liveProj").textContent = s.proj;
+          document.getElementById("liveMeta").textContent = s.meta;
+        }
+      });
+    });
+
+    /* Stable 13×7 activity */
+    (function () {
+      let s = 20260908;
+      const rand = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+      const frag = document.createDocumentFragment();
+      for (let col = 0; col < 13; col++) {
+        for (let row = 0; row < 7; row++) {
+          const recency = col / 12;
+          const active = rand() < 0.18 + recency * 0.42;
+          const level = active ? 1 + Math.floor(rand() * (1 + recency * 3)) : 0;
+          const cell = document.createElement("i");
+          cell.className = "cell" + (level ? " l" + Math.min(level, 4) : "");
+          frag.appendChild(cell);
+        }
+      }
+      /* grid is row-major in CSS; we filled column-major like GitHub. Rebuild row-major. */
+      const cells = [...frag.children];
+      heat.innerHTML = "";
+      for (let row = 0; row < 7; row++) {
+        for (let col = 0; col < 13; col++) {
+          heat.appendChild(cells[col * 7 + row]);
+        }
+      }
+    })();
+
+    /* QR-like mark with finder patterns */
+    (function () {
+      const n = 25;
+      const on = Array.from({ length: n }, () => Array(n).fill(false));
+      const set = (x, y, v = true) => { if (x >= 0 && y >= 0 && x < n && y < n) on[y][x] = v; };
+      function finder(x, y) {
+        for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+          const edge = i === 0 || i === 6 || j === 0 || j === 6;
+          const inner = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+          set(x + i, y + j, edge || inner);
+        }
+      }
+      finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+      for (let i = 8; i < n - 8; i++) { set(i, 6, i % 2 === 0); set(6, i, i % 2 === 0); }
+      let s = 0xC0D3 ^ 0x2026;
+      const rand = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const inFinder = (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8) || x === 6 || y === 6;
+        if (!inFinder && rand() > 0.46) on[y][x] = true;
+      }
+      const size = 140;
+      const m = size / n;
+      let d = "";
+      on.forEach((row, y) => row.forEach((v, x) => { if (v) d += `<rect x="${x * m}" y="${y * m}" width="${m}" height="${m}"/>`; }));
+      document.getElementById("qr").innerHTML = `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="${size}" height="${size}" fill="#F4EFE4"/><g fill="#0B1018">${d}</g></svg>`;
+    })();
+  </script>
+</body>
+</html>
