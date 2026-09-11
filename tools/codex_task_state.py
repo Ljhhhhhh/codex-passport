@@ -374,6 +374,7 @@ class TranscriptWatcher:
 
             task_messages.append({
                 "id": tid,
+                "event": (task["turn"], tuple(sorted(task.get("pending", {})))),
                 "title": title,
                 "project": proj_name,
                 "status": msg_status,
@@ -384,11 +385,11 @@ class TranscriptWatcher:
 
         task_messages.sort(key=lambda m: m["updated"], reverse=True)
 
-        # Deduplicate tasks belonging to the same project and topic/title
+        # Deduplicate transcript records by task identity; equal titles are distinct tasks.
         deduped = []
         seen_keys = set()
         for m in task_messages:
-            k = (m["project"], m["title"])
+            k = m["id"]
             if k not in seen_keys:
                 seen_keys.add(k)
                 deduped.append(m)

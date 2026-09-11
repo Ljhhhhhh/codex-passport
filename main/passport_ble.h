@@ -28,6 +28,7 @@ esp_err_t passport_ble_init(void);
 // Returns true if a host is currently connected via BLE
 bool passport_ble_is_connected(void);
 uint32_t passport_ble_unread_count(void);
+bool passport_ble_take_alert(void);
 
 // Send ACK packet to connected host
 esp_err_t passport_ble_send_ack(uint8_t ack_msg_type, uint8_t status);

@@ -3,8 +3,17 @@
 #include "passport_protocol.h"
 #include "passport_storage.h"
 #include "passport_ui.h"
+#include "passport_alert.h"
 #include <string.h>
 #include <stdatomic.h>
+
+static _Atomic bool s_alert_pending;
+static uint32_t s_alert_sequence;
+
+bool passport_ble_take_alert(void)
+{
+    return atomic_exchange(&s_alert_pending, false);
+}
 
 static _Atomic uint32_t s_unread_count = UINT32_MAX;
 
@@ -91,6 +100,8 @@ static int passport_gap_event(struct ble_gap_event *event, void *arg)
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         s_connected = false;
         atomic_store(&s_unread_count, UINT32_MAX);
+        atomic_store(&s_alert_pending, false);
+        s_alert_sequence = 0;
         passport_ui_set_ble_connected(false);
         passport_reassembler_reset(&s_reassembler);
         passport_ble_advertise();
@@ -139,6 +150,16 @@ static int gatt_chr_access_rx(uint16_t conn_handle, uint16_t attr_handle,
         ESP_LOGI(TAG, "Reassembled full message type 0x%02X, len %zu", out_msg_type, out_payload_len);
 
         switch (out_msg_type) {
+        case MSG_TYPE_ALERT: {
+            if (out_payload_len != sizeof(uint32_t)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+            uint32_t sequence;
+            memcpy(&sequence, out_payload, sizeof(sequence));
+            if (passport_alert_accept(&s_alert_sequence, sequence)) {
+                atomic_store(&s_alert_pending, true);
+            }
+            passport_ble_send_ack(MSG_TYPE_ALERT, 0);
+            break;
+        }
         case MSG_TYPE_UNREAD: {
             if (out_payload_len != sizeof(uint32_t)) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
             uint32_t count;
@@ -247,7 +268,7 @@ static int gatt_chr_access_tx(uint16_t conn_handle, uint16_t attr_handle,
     (void)arg;
 
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        uint8_t status[] = {s_connected ? 1 : 0, 0x50, 1, passport_ui_project_page(), 1};
+        uint8_t status[] = {s_connected ? 1 : 0, 0x50, 1, passport_ui_project_page(), 1, 1};
         os_mbuf_append(ctxt->om, status, sizeof(status));
         return 0;
     }

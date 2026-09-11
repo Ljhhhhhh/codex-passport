@@ -4,80 +4,189 @@
 
 # Codex Passport (`codex-passport`)
 
-A personal digital identity and activity companion for OpenAI Codex on the ESP32-C3 FoloToy AI Passport (240 × 320).
+A smart ambient desktop AI companion hardware built for OpenAI Codex and OpenCodex users, running on the FoloToy AI Passport (ESP32-C3 wearable card with a 240 × 320 color LCD).
 
-## Message List and Status
+Codex Passport sits gracefully under your monitor as a dedicated status display or clips to your lanyard as a digital badge. Communicating over Bluetooth Low Energy (NimBLE) with your Mac, it ambiently mirrors your coding agents' activities, pending user prompts, task completions, and account quotas with soft, unobtrusive sound alerts.
 
-The device starts on **MESSAGES**. UP/DOWN cycles Home, Quota and Messages; on Messages, OK requests the next group of three messages. OK opens QR on other pages. A changed message snapshot wakes a sleeping screen for 30 seconds.
+---
 
-Restart the Mac service after upgrading the firmware: `projects/codex-passport/tools/passport-sync restart`. `passport-sync logs` reports **Projects ACK** only after the device acknowledges a message page. An older firmware produces an explicit upgrade message.
+## Key Features
 
-Messages display unread completed, waiting input, and failed tasks, each showing real task title, status, and project name. Tasks in the same project are listed individually. Outstanding input questions take precedence as waiting input. Waiting input and failed tasks are not limited to today's records; unread completed tasks are backfilled using desktop unread IDs. If unread source fails, synchronization error is reported. Running and interrupted tasks are excluded; re-running a task removes previous message status. Sorted by status update time descending; empty list shows "No Messages".
+- 📡 **Real-time Task Status & Messages**: Displays live Codex tasks at a glance, highlighting **waiting for user input**, **unread completed**, and **failed** tasks with verified task titles and project directory names.
+- 🔔 **Intelligent Event-Driven Alerts**: Chimes softly (gentle C5/E5 double tone with a 15 ms fade-in and smooth release) only when a new actionable event arises; initial syncing of historical tasks, paging, polling, and reconnects remain completely silent.
+- 💤 **Unread-Aware Backlight & Power Saving**: The display stays illuminated while there are actionable unread tasks across hosts and projects. Once all tasks are inspected in Codex, the backlight smoothly sleeps after 30 seconds of inactivity. Tap OK anytime to wake.
+- 📊 **Account Quota & Token Meter**: Reads local OpenCodex and Codex ledgers to report 5-hour and weekly usage percentages across 3 accounts, today's token consumption, lifetime usage, and activity streaks.
+- 📶 **Zero-Configuration Mac Sync**: Backed by a lightweight macOS login background service (LaunchAgent) that auto-discovers and connects over BLE. No Wi-Fi passwords or manual pairing codes required on the device.
+- 🔤 **Complete High-Definition Chinese Typography**: Includes a pre-rendered 30,440-glyph bitmap font derived from Source Han Sans (SIL OFL 1.1 license), ensuring crisp Chinese text without missing character boxes or encoding corruption.
 
-Device-side read-receipt marking is not included. Short ID is displayed if title is missing. Usage statistics still come from the existing usage collector.
+---
 
-## Screens
+## 1-Minute Quick Start Guide
 
-- **Home**: Name, last BLE sync time, today's tokens, plus lifetime / last 7 days / streak.
-- **Quota**: Three Codex login accounts, each with 5-hour and weekly limit percent.
-- **Messages**: Message list of unread completed, waiting input, and failed tasks, three per page.
-- **QR** (OK on other pages): GitHub homepage.
+### What You Need
 
-Status bar: BLE, Codex state (`IDLE` / `RUN` / `WAIT` / `DONE` / `ERR`), battery. While a session is active, a live line shows the active task's project and duration.
+1. A **FoloToy AI Passport** device
+2. A USB Type-C cable supporting **data transfer** (not power-only)
+3. A Mac running macOS
 
-## Buttons
+---
 
-| Button | Action |
-| :--- | :--- |
-| `UP` | Previous page |
-| `DOWN` | Next page |
-| `OK` | Next group on Messages; open or close QR elsewhere |
+### Step 1: Flash Firmware to Device
 
-The screen stays on while the Codex app has unread tasks across hosts and projects. Open the corresponding tasks in Codex to clear them; device buttons do not mark tasks read. Once the unread count reaches zero, the backlight turns off after 30 seconds idle. `OK` wakes it without toggling QR. `UP` and `DOWN` do not wake the screen. Until the unread count is available, or if BLE disconnects or the app state cannot be read, the screen stays on.
+Choose either of the two installation paths:
 
-The Mac reads `electron-thread-read-state-v1` (with fallback to legacy `unread-thread-ids-by-host-v1`) from `$CODEX_HOME/.codex-global-state.json` (default `~/.codex`), syncing changes every two seconds.
+#### Method A: Web Flasher (No Toolchain Required, Recommended)
 
-## Flash
+1. Open Chrome or Edge and navigate to the [ESP Web Flasher](https://espressif.github.io/esptool-js/).
+2. Connect the AI Passport to your Mac with your USB-C data cable.
+3. Download the ready-to-flash merged binary: `codex-passport-full.bin` (from Releases or build artifacts).
+4. Configure flashing options:
+   - Baud rate: `460800`
+   - Flash address: `0x0`
+5. Click **Connect**, choose the USB serial port, and click **Program**. Once flashing completes, the device will reboot into the application.
 
-Merged image (flash at `0x0`):
+#### Method B: Local Command Line Build (For Developers)
 
-`build/codex-passport-full.bin`
-
-Web flasher: connect the ESP32-C3 USB JTAG port, start address `0x0`, baud `460800`.
-
-Or from an ESP-IDF 5.5.3 shell:
-
-```bash
-idf.py -C projects/codex-passport flash
-```
-
-Flashing the merged image from `0x0` reloads factory profile defaults.
-
-## Sync from the Mac
-
-The device advertises as `Codex-Passport`. Install the login agent once:
+If you have **ESP-IDF 5.5.3** installed and active:
 
 ```bash
-projects/codex-passport/tools/passport-sync install
+# Compile and flash to connected device, then launch the serial monitor
+idf.py flash monitor
 ```
 
-That starts BLE sync now, again at login, and after crashes. Control it with `start` / `stop` / `restart` / `status` / `logs`, or from Raycast: Settings → Extensions → Script Commands → Add Directories → `projects/codex-passport/tools/raycast`. Search `Codex Passport`.
+---
 
-Foreground (no login agent): `python3 projects/codex-passport/tools/assistant.py --sync --interval 60` after `pip install bleak`. Optional: `--device <address>`, `--config path/to/config.json`, `--interval 120`.
+### Step 2: Install Mac Companion Sync Service
 
-The device is BLE-only. Wi-Fi is not used: the ESP32-C3 already runs LVGL and NimBLE without PSRAM, and the Mac must be nearby to read `~/.opencodex`.
-
-This prefers local `~/.opencodex/usage.jsonl` (the same ledger as the OpenCodex dashboard at `/#usage`), deduplicates by `requestId`, and maps the last 30 days' top models onto the directions page. If that file is absent, it falls back to `~/.codex/sessions` and `response_id`.
-
-A sanitized template is `projects/codex-passport/config.example.json`. Keep a real profile out of git.
-
-## Validation
+From the root of this repository on your Mac, run the one-command installer:
 
 ```bash
-./tools/validate.sh --static
-./tools/validate.sh --firmware codex-passport
+./tools/passport-sync install
 ```
 
-## Design
+- **Automated Setup**: Creates an isolated virtual environment, installs necessary dependencies (`bleak`), and registers a macOS LaunchAgent.
+- **Background Daemon**: Starts syncing immediately, launches on user login, and automatically restarts on unexpected exits.
+- **Helpful Commands**:
+  ```bash
+  ./tools/passport-sync status   # Show running status and PID
+  ./tools/passport-sync logs     # Print recent sync logs
+  ./tools/passport-sync restart  # Restart the service
+  ./tools/passport-sync stop     # Temporarily stop the service
+  ```
+- **Raycast Integration**: In Raycast Settings → Extensions → Script Commands → Add Directories, select `tools/raycast` to control sync directly from Raycast.
 
-[docs/software-design/codex-passport-design.md](docs/codex-passport-design.md)
+---
+
+### Step 3: Power On & Enjoy
+
+1. Turn on the AI Passport power switch; the device boots directly into **MESSAGES**.
+2. The Mac service will detect the advertising peripheral `Codex-Passport` and establish a BLE connection automatically.
+3. As you code with Codex:
+   - When an agent asks a question requiring your input, the screen wakes and a soft chime sounds.
+   - When background tasks complete, cards populate the unread message queue.
+   - Once reviewed in Codex, unread tasks clear and the device gently sleeps after 30 seconds idle.
+
+---
+
+## Screen Views & Button Controls
+
+The front panel features three tactile buttons:
+
+| Button | Messages View (MESSAGES) | Home / Quota Views | QR View | When Asleep |
+| :--- | :--- | :--- | :--- | :--- |
+| **UP** | Previous view | Previous view | - | Ignored (prevents accidental wake) |
+| **DOWN** | Next view | Next view | - | Ignored (prevents accidental wake) |
+| **OK** | **Next page of 3 messages** | **Open homepage QR** | **Close QR** | **Wake screen** (stays awake 30s) |
+
+### Views Overview
+
+- **Messages View (MESSAGES)**: Default home view displaying unread completed, waiting input, and failed tasks, 3 per page. Shows status badges (`WAIT` / `DONE` / `ERR`), real task titles, and project names.
+- **Home View**: Your nickname, last sync timestamp, today's tokens, plus lifetime volume, 7-day usage, and consecutive active days.
+- **Quota View**: Live visual progress bars and percentages for 5-hour and weekly limits across 3 Codex login accounts.
+- **QR View**: Displays your personal GitHub or website QR code. Toggle with the OK key on other views.
+- **Top Status Bar**: Live indicators for BLE connection, current Codex agent status (`IDLE` / `RUN` / `WAIT` / `DONE` / `ERR`), and battery fuel gauge percentage.
+
+---
+
+## Troubleshooting & FAQ
+
+<details>
+<summary><strong>Q: Why does the screen turn off automatically?</strong></summary>
+
+This is an intentional power-saving feature. When all tasks in Codex are marked read and no questions are pending, the unread count drops to zero. After 30 seconds of inactivity, the backlight turns off. Pressing the OK button immediately wakes the screen for 30 seconds.
+</details>
+
+<details>
+<summary><strong>Q: When will the audio chime sound? Will it interrupt my flow?</strong></summary>
+
+The chime is **strictly event-driven**:
+- Plays only when a **new user-input question**, a **new unread completed task**, or an **error** is detected.
+- Startup historical task loading, page cycling, background polling, and BLE reconnects remain completely silent.
+</details>
+
+<details>
+<summary><strong>Q: My computer cannot find the USB serial port?</strong></summary>
+
+1. Verify your USB cable has **data transfer lines**; charge-only cables will not expose serial ports.
+2. The ESP32-C3 uses native USB-Serial-JTAG, which requires no external drivers on macOS or modern Linux (devices appear as `/dev/cu.usbmodem*`).
+</details>
+
+<details>
+<summary><strong>Q: BLE connection drops or fails to connect?</strong></summary>
+
+1. Confirm the Mac background service is running via `./tools/passport-sync status`.
+2. Inspect connection details with `./tools/passport-sync logs`. The device advertises as `Codex-Passport` and connects automatically without manual Bluetooth pairing.
+</details>
+
+---
+
+## Development & Customization
+
+### Building Firmware Locally
+
+Make sure **ESP-IDF 5.5.3** is activated in your environment:
+
+```bash
+# Build firmware
+idf.py build
+
+# Flash and view logs
+idf.py flash monitor
+
+# Generate merged binary for web flashing
+idf.py merge-bin -o build/codex-passport-full.bin
+```
+
+### Running Unit Tests
+
+```bash
+# Audio chime envelope validation
+python3 tests/test_passport_audio.py
+
+# 30,440-character font bitmap integrity test
+python3 tests/test_passport_font.py
+
+# Event-driven alert and task deduplication test
+python3 tests/test_project_sync.py
+
+# Usage analytics parsing and deduplication test
+python3 tests/test_codex_analytics.py
+```
+
+### Customizing Your Profile
+
+Copy the template:
+
+```bash
+cp config.example.json profile.json
+```
+
+Edit `profile.json` with your name, interests, signature, and homepage URL. Upon sync, your AI Passport will reflect your personal digital profile and QR code.
+
+---
+
+## License & Acknowledgements
+
+- Source code is released under the same license terms as the upstream project.
+- Bundled Chinese font is based on Source Han Sans SC, licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt).
+- Hardware architecture powered by FoloToy AI Passport.

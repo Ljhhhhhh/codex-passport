@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from codex_task_state import TranscriptWatcher
 from codex_unread import unread_count, UNKNOWN_UNREAD
-from passport_protocol import create_frames, crc16_ccitt, pack_projects_page, MSG_TYPE_PROJECTS
+from passport_protocol import encode_text, create_frames, crc16_ccitt, pack_projects_page, MSG_TYPE_PROJECTS, MSG_TYPE_ALERT
 
 from codex_collector import (
     STATE_IDLE,
@@ -68,11 +68,11 @@ DEFAULT_PROFILE = {
 
 
 def serialize_profile(prof: Dict[str, str]) -> bytes:
-    name_b = prof.get("name", "GuanMo").encode("utf-8")[:47]
-    int_b = prof.get("interests", "读书 / 开发 / 运动").encode("utf-8")[:95]
-    sig_b = prof.get("signature", "In me the tiger sniffs the rose.").encode("utf-8")[:95]
-    hp_b = prof.get("homepage", "https://github.com/Ljhhhhhh").encode("utf-8")[:127]
-    date_b = prof.get("issue_date", "2026-09-08").encode("utf-8")[:15]
+    name_b = encode_text(prof.get("name", "GuanMo"), 47)
+    int_b = encode_text(prof.get("interests", "读书 / 开发 / 运动"), 95)
+    sig_b = encode_text(prof.get("signature", "In me the tiger sniffs the rose."), 95)
+    hp_b = encode_text(prof.get("homepage", "https://github.com/Ljhhhhhh"), 127)
+    date_b = encode_text(prof.get("issue_date", "2026-09-08"), 15)
 
     return struct.pack(
         "<48s96s96s128s16s",
@@ -85,7 +85,7 @@ def serialize_profile(prof: Dict[str, str]) -> bytes:
 
 
 def serialize_stats(stats: Dict[str, Any]) -> bytes:
-    stamp = str(stats.get("synced_at") or datetime.now().strftime("%m-%d %H:%M")).encode("utf-8")[:15]
+    stamp = encode_text(str(stats.get("synced_at") or datetime.now().strftime("%m-%d %H:%M")), 15)
     return struct.pack(
         "<QIIH16s",
         int(stats.get("total_tokens", 0)),
@@ -102,8 +102,8 @@ def serialize_heatmap(heatmap: Dict[str, Any]) -> bytes:
     if len(levels) < 91:
         levels = levels + b"\x00" * (91 - len(levels))
 
-    start_date_b = heatmap.get("start_date", "2026-06-14").encode("utf-8")[:15]
-    end_date_b = heatmap.get("end_date", "2026-09-13").encode("utf-8")[:15]
+    start_date_b = encode_text(heatmap.get("start_date", "2026-06-14"), 15)
+    end_date_b = encode_text(heatmap.get("end_date", "2026-09-13"), 15)
     active_days = int(heatmap.get("active_days", 0))
     max_tokens = int(heatmap.get("max_daily_tokens", 0))
 
@@ -124,8 +124,8 @@ def serialize_footprints(footprints: List[Dict[str, Any]]) -> bytes:
     for i in range(6):
         if i < count:
             fp = footprints[i]
-            top_b = fp.get("topic", "").encode("utf-8")[:31]
-            dt_b = fp.get("first_date", "").encode("utf-8")[:15]
+            top_b = encode_text(fp.get("topic", ""), 31)
+            dt_b = encode_text(fp.get("first_date", ""), 15)
             tok = int(fp.get("total_tokens", 0))
         else:
             top_b = b""
@@ -143,7 +143,7 @@ def serialize_directions(directions: List[Dict[str, Any]]) -> bytes:
     for i in range(5):
         if i < count:
             d = directions[i]
-            nm_b = d.get("name", "").encode("utf-8")[:31]
+            nm_b = encode_text(d.get("name", ""), 31)
             tok = int(d.get("tokens", 0))
             pct = int(d.get("percent", 0))
         else:
@@ -162,7 +162,7 @@ def serialize_quota(quota: Dict[str, Any]) -> bytes:
     for i in range(3):
         if i < count:
             acc = accounts[i]
-            name_b = str(acc.get("name", "")).encode("utf-8")[:11]
+            name_b = encode_text(str(acc.get("name", "")), 11)
             body.extend(
                 struct.pack(
                     "<12sBBII",
@@ -185,7 +185,7 @@ def serialize_realtime(rt: Dict[str, Any]) -> bytes:
     duration = int(rt.get("duration_sec", 0))
     turn_tokens = int(rt.get("turn_tokens", 0))
     today_tokens = int(rt.get("today_tokens", 0))
-    proj_b = rt.get("project", "").encode("utf-8")[:31]
+    proj_b = encode_text(rt.get("project", ""), 31)
 
     return struct.pack("<BHII32s", state, duration, turn_tokens, today_tokens, proj_b)
 
@@ -211,6 +211,23 @@ def load_profile(custom_path: Optional[str] = None) -> Dict[str, str]:
 
     print("[*] Using default GuanMo credentials.")
     return dict(DEFAULT_PROFILE)
+
+
+class MessageAlerts:
+    """One chime per newly observed actionable task event; snapshots are silent."""
+    def __init__(self):
+        self.previous = None
+
+    def update(self, items, valid=True):
+        if not valid:
+            self.previous = None
+            return False
+        current = {m["id"]: (m.get("event"), m["status"])
+                   for m in items if m.get("id") and m["status"] in (1, 2, 3)}
+        changed = self.previous is not None and any(
+            self.previous.get(key) != event for key, event in current.items())
+        self.previous = current
+        return changed
 
 
 class PassportAssistant:
@@ -268,6 +285,9 @@ class PassportAssistant:
                     crc16_ccitt(data[:-2]) == int.from_bytes(data[-2:], "big")):
                 ack_queue.put_nowait(data[8:10])
         await client.start_notify(PASSPORT_CHR_TX_UUID, on_notify)
+        alerts = MessageAlerts()
+        alert_sequence = 0
+        alerts_supported = len(caps) >= 6 and caps[5] == 1
         last_projects = None
         last_unread = None
         analytics = asyncio.create_task(asyncio.to_thread(self.prepare_sync_payloads))
@@ -288,9 +308,10 @@ class PassportAssistant:
                         print(f"[+] Unread ACK: {count if count != UNKNOWN_UNREAD else 'unknown; screen stays on'}")
                 poll_res = await asyncio.to_thread(self.watcher.poll)
                 if len(poll_res) == 3:
-                    items, status, _ = poll_res
+                    items, status, sync_error = poll_res
                 else:
                     items, status = poll_res
+                    sync_error = False
                 if projects_supported:
                     caps = bytes(await client.read_gatt_char(PASSPORT_CHR_TX_UUID))
                     page_count = max(1, (len(items) + 2) // 3)
@@ -310,6 +331,16 @@ class PassportAssistant:
                         last_projects = raw
                         print(f"[+] Projects ACK: page {page + 1}/{page_count}, "
                               f"projects={len(items)}, state={status['state_name']}")
+                if alerts.update(items, not sync_error) and alerts_supported:
+                    alert_sequence += 1
+                    while not ack_queue.empty():
+                        ack_queue.get_nowait()
+                    for frame in create_frames(MSG_TYPE_ALERT, struct.pack("<I", alert_sequence)):
+                        await client.write_gatt_char(PASSPORT_CHR_RX_UUID, frame, response=True)
+                    ack = await asyncio.wait_for(ack_queue.get(), timeout=3)
+                    if ack != bytes([MSG_TYPE_ALERT, 0]):
+                        raise RuntimeError("Message alert rejected by device")
+                    print("[+] Message alert ACK")
                 await client.write_gatt_char(PASSPORT_CHR_LIVE_UUID, serialize_realtime(status), response=True)
                 if analytics is not None and analytics.done():
                     for msg_type, raw in analytics.result().items():

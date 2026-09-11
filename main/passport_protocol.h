@@ -27,6 +27,7 @@ typedef enum {
     MSG_TYPE_QUOTA       = 0x08,
     MSG_TYPE_PROJECTS    = 0x09,
     MSG_TYPE_MESSAGES    = 0x09, // alias for task messages page
+    MSG_TYPE_ALERT       = 0x0C, // session-local uint32 event sequence
     MSG_TYPE_UNREAD      = 0x0A, // uint32 little-endian; UINT32_MAX means unknown
 } passport_msg_type_t;
 

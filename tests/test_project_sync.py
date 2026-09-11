@@ -14,10 +14,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from codex_task_state import TranscriptWatcher
 from codex_unread import UNKNOWN_UNREAD
 from passport_protocol import create_frames, pack_projects_page
-from assistant import PassportAssistant
+from assistant import PassportAssistant, MessageAlerts
 
 
 class ProjectSyncTests(unittest.TestCase):
+    def test_alerts_follow_identity_and_turn_not_count(self):
+        a = MessageAlerts()
+        def message(tid, status=2, turn="one"):
+            return dict(id=tid, status=status, event=(turn, ()))
+        self.assertFalse(a.update([message("old")]))
+        self.assertFalse(a.update([message("old")]))
+        self.assertTrue(a.update([message("new")]))  # same count
+        self.assertFalse(a.update([message("new")]))
+        self.assertFalse(a.update([message("new", 4)]))  # running
+        self.assertTrue(a.update([message("new", 1)]))  # input needed
+        self.assertTrue(a.update([message("new", 3)]))  # failed
+        self.assertTrue(a.update([message("new", 2, "two")]))
+        self.assertFalse(a.update([], False))
+        self.assertFalse(a.update([message("new", 2, "two")]))
+        self.assertFalse(a.update([]))  # read/removal
+
     def test_transcripts_recovery_parallel_partial_and_terminals(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -201,6 +217,36 @@ int main(int argc, char **argv) {
             f1.write_bytes(frames[0])
             f2.write_bytes(frames[1])
             subprocess.run([str(binary), str(f1), str(f2)], check=True)
+
+    def test_event_alert_after_page_ack_and_no_replay(self):
+        class Watcher:
+            calls = 0
+            def poll(self):
+                self.calls += 1
+                tid = "old" if self.calls == 1 else "new"
+                return [dict(id=tid, title=tid, project="p", status=2)], dict(state=3, state_name="DONE"), False
+        class Device:
+            is_connected = True
+            events = []
+            async def read_gatt_char(self, uuid):
+                return b"\x01P\x01\x00\x01\x01"
+            async def start_notify(self, uuid, callback):
+                self.callback = callback
+            async def write_gatt_char(self, uuid, data, response):
+                if data[:3] == b"PT\x01" and data[4] == data[5] - 1:
+                    kind = data[3]
+                    self.events.append(kind)
+                    self.callback(None, create_frames(7, bytes([kind, 0]))[0])
+        device = Device()
+        service = PassportAssistant.__new__(PassportAssistant)
+        service.watcher = Watcher()
+        service.prepare_sync_payloads = lambda: {}
+        async def tick(_):
+            if service.watcher.calls >= 3:
+                device.is_connected = False
+        with patch("assistant.unread_count", return_value=1), patch("assistant.asyncio.sleep", side_effect=tick):
+            asyncio.run(service._session_loop(device, 60))
+        self.assertEqual(device.events, [10, 9, 9, 12])
 
     def test_live_service_sends_projects_and_requires_ack(self):
         class Watcher:

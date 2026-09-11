@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import struct
+from pathlib import Path
+from functools import lru_cache
 from typing import Any, Dict, List, Tuple
 
 PASSPORT_MAGIC_0 = 0x50  # 'P'
@@ -18,6 +20,17 @@ MSG_TYPE_PROJECTS = 0x09
 MSG_TYPE_MESSAGES = 0x09
 MSG_TYPE_TASKS = 0x0A
 MSG_TYPE_ACTION_READ = 0x0B
+MSG_TYPE_ALERT = 0x0C
+
+@lru_cache(maxsize=1)
+def supported_chars():
+    return frozenset((Path(__file__).resolve().parents[1] / "assets/fonts/charset.txt").read_text(encoding="utf-8"))
+
+
+def encode_text(text: str, limit: int) -> bytes:
+    text = "".join(c if c.isprintable() else " " for c in str(text))
+    text = "".join(c if c in supported_chars() else "?" for c in text)
+    return text.encode("utf-8", errors="replace")[:limit].decode("utf-8", errors="ignore").encode("utf-8")
 
 def crc16_ccitt(data: bytes) -> int:
     crc = 0xFFFF
@@ -37,8 +50,8 @@ def pack_projects_page(page_index: int, total_pages: int, items: List[Dict[str, 
     for i in range(3):
         if i < count:
             it = items[i]
-            title = (it.get('title') or it.get('name') or '').encode('utf-8')[:63].decode('utf-8', errors='ignore').encode('utf-8')
-            project = (it.get('project') or '').encode('utf-8')[:31].decode('utf-8', errors='ignore').encode('utf-8')
+            title = encode_text(it.get('title') or it.get('name') or '', 63)
+            project = encode_text(it.get('project') or '', 31)
             status = int(it.get('status', 0)) & 0xFF
             item_bytes += struct.pack('>64s32sB', title, project, status)
         else:

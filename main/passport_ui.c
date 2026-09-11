@@ -177,7 +177,7 @@ static void create_page_home(lv_obj_t *parent)
     s_lbl_name = lv_label_create(parent);
     lv_label_set_text(s_lbl_name, "GuanMo");
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(COL_IVORY), 0);
-    lv_obj_set_style_text_font(s_lbl_name, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(s_lbl_name, &font_passport_16, 0);
     lv_obj_align(s_lbl_name, LV_ALIGN_TOP_LEFT, 12, 32);
 
 
@@ -268,7 +268,7 @@ static void create_page_quota(lv_obj_t *parent)
         s_lbl_q_name[i] = lv_label_create(parent);
         lv_label_set_text(s_lbl_q_name[i], "--");
         lv_obj_set_style_text_color(s_lbl_q_name[i], lv_color_hex(COL_IVORY), 0);
-        lv_obj_set_style_text_font(s_lbl_q_name[i], &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(s_lbl_q_name[i], &font_passport_16, 0);
         lv_obj_set_width(s_lbl_q_name[i], 70);
         lv_label_set_long_mode(s_lbl_q_name[i], LV_LABEL_LONG_CLIP);
         lv_obj_align(s_lbl_q_name[i], LV_ALIGN_TOP_LEFT, 12, y);
@@ -536,7 +536,7 @@ esp_err_t passport_ui_init(void)
     s_lbl_live_proj = lv_label_create(s_live);
     lv_label_set_text(s_lbl_live_proj, "");
     lv_obj_set_style_text_color(s_lbl_live_proj, lv_color_hex(COL_GOLD), 0);
-    lv_obj_set_style_text_font(s_lbl_live_proj, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_live_proj, &font_passport_16, 0);
     lv_label_set_long_mode(s_lbl_live_proj, LV_LABEL_LONG_DOT);
     lv_obj_set_width(s_lbl_live_proj, 130);
     lv_obj_align(s_lbl_live_proj, LV_ALIGN_LEFT_MID, 10, 0);
@@ -919,6 +919,7 @@ static void create_page_projects(lv_obj_t *parent)
     s_lbl_proj_title = lv_label_create(parent);
     lv_label_set_text(s_lbl_proj_title, "Waiting for Mac sync");
     style_micro(s_lbl_proj_title);
+    lv_obj_set_style_text_font(s_lbl_proj_title, &font_passport_16, 0);
     lv_obj_align(s_lbl_proj_title, LV_ALIGN_TOP_LEFT, 10, 24);
 
     for (int i = 0; i < 3; i++) {

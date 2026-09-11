@@ -17,7 +17,6 @@
 
 static const char *TAG = "codex-passport";
 static passport_idle_t s_idle;
-static passport_alert_mgr_t s_alert;
 static QueueHandle_t s_buttons;
 
 static void apply_idle(passport_idle_act_t act)
@@ -51,10 +50,6 @@ static void ui_input_task(void *arg)
         uint32_t unread = passport_ble_unread_count();
         apply_idle(passport_idle_set_unread(&s_idle, unread));
         apply_idle(passport_idle_on_tick(&s_idle, dt));
-        passport_alert_update_unread(&s_alert, unread);
-        if (passport_alert_tick(&s_alert, dt)) {
-            passport_alert_play_chime();
-        }
         previous = now;
         if (passport_ui_take_project_update()) {
             bool was_asleep = !s_idle.awake;
@@ -72,6 +67,18 @@ static void ui_input_task(void *arg)
         if (btn == BSP_BTN_UP) passport_ui_prev_item();
         else if (btn == BSP_BTN_DOWN) passport_ui_next_item();
         else if (btn == BSP_BTN_OK) passport_ui_toggle_qr();
+    }
+}
+
+static void alert_task(void *arg)
+{
+    (void)arg;
+    while (1) {
+        if (passport_ble_take_alert()) {
+            ESP_LOGI(TAG, "Playing new message chime");
+            passport_alert_play_chime();
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -111,7 +118,6 @@ void app_main(void)
     }
     bsp_display_backlight(100);
     passport_idle_init(&s_idle);
-    passport_alert_init(&s_alert);
 
     bool has_batt = (bsp_battery_init() == ESP_OK);
     ESP_LOGI(TAG, "Battery sensor CW2017: %s", has_batt ? "detected" : "not fitted (using default)");
@@ -123,6 +129,7 @@ void app_main(void)
     configASSERT(xTaskCreate(ui_input_task, "passport_input", 3072, NULL, 4, NULL) == pdPASS);
     ESP_ERROR_CHECK(bsp_button_init(on_button_event, NULL));
     ESP_ERROR_CHECK(passport_ble_init());
+    configASSERT(xTaskCreate(alert_task, "passport_audio", 3072, NULL, 3, NULL) == pdPASS);
 
     xTaskCreate(battery_task, "battery_task", 3072, has_batt ? (void *)1 : NULL, 4, NULL);
 
