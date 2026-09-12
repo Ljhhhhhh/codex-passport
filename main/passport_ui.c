@@ -85,15 +85,18 @@ static void strip_obj(lv_obj_t *obj)
 
 static void format_scaled(uint64_t tokens, char *num, size_t nlen, const char **scale)
 {
-    if (tokens >= 1000000000ULL) {
-        snprintf(num, nlen, "%.1f", (double)tokens / 1000000000.0);
-        *scale = "B";
-    } else if (tokens >= 1000000ULL) {
-        snprintf(num, nlen, "%.1f", (double)tokens / 1000000.0);
-        *scale = "M";
-    } else if (tokens >= 1000ULL) {
-        snprintf(num, nlen, "%.1f", (double)tokens / 1000.0);
-        *scale = "K";
+    if (tokens >= 100000000ULL) {
+        double val = (double)tokens / 100000000.0;
+        snprintf(num, nlen, "%.1f", val);
+        char *dot = strchr(num, '.');
+        if (dot && strcmp(dot, ".0") == 0) *dot = '\0';
+        *scale = "亿";
+    } else if (tokens >= 10000ULL) {
+        double val = (double)tokens / 10000.0;
+        snprintf(num, nlen, "%.1f", val);
+        char *dot = strchr(num, '.');
+        if (dot && strcmp(dot, ".0") == 0) *dot = '\0';
+        *scale = "万";
     } else {
         snprintf(num, nlen, "%llu", (unsigned long long)tokens);
         *scale = "";
@@ -195,20 +198,16 @@ static void create_page_home(lv_obj_t *parent)
     style_kicker(today_k);
     lv_obj_align(today_k, LV_ALIGN_TOP_LEFT, 12, 8);
 
-    s_lbl_issue = lv_label_create(today);
-    lv_label_set_text(s_lbl_issue, "08 SEP 26");
-    style_micro(s_lbl_issue);
-    lv_obj_align(s_lbl_issue, LV_ALIGN_TOP_RIGHT, -12, 8);
-
     s_lbl_today_num = lv_label_create(today);
-    lv_label_set_text(s_lbl_today_num, "7.7");
+    lv_label_set_text(s_lbl_today_num, "0");
     lv_obj_set_style_text_color(s_lbl_today_num, lv_color_hex(COL_IVORY), 0);
     lv_obj_set_style_text_font(s_lbl_today_num, &lv_font_montserrat_28, 0);
     lv_obj_align(s_lbl_today_num, LV_ALIGN_TOP_LEFT, 12, 28);
 
     s_lbl_today_unit = lv_label_create(today);
-    lv_label_set_text(s_lbl_today_unit, "M TOKENS");
+    lv_label_set_text(s_lbl_today_unit, "万 Token");
     style_kicker(s_lbl_today_unit);
+    lv_obj_set_style_text_font(s_lbl_today_unit, &font_passport_16, 0);
     lv_obj_align(s_lbl_today_unit, LV_ALIGN_TOP_RIGHT, -12, 36);
 
     lv_obj_t *strip = lv_obj_create(parent);
@@ -222,7 +221,7 @@ static void create_page_home(lv_obj_t *parent)
 
     const char *titles[3] = {"TOTAL", "WEEK", "DAYS"};
     lv_obj_t **vals[3] = {&s_lbl_m_total, &s_lbl_m_week, &s_lbl_m_streak};
-    const char *seed[3] = {"2.1B", "94M", "2d"};
+    const char *seed[3] = {"--", "--", "--"};
     for (int i = 0; i < 3; i++) {
         lv_obj_t *cell = lv_obj_create(strip);
         strip_obj(cell);
@@ -243,8 +242,8 @@ static void create_page_home(lv_obj_t *parent)
         *vals[i] = lv_label_create(cell);
         lv_label_set_text(*vals[i], seed[i]);
         lv_obj_set_style_text_color(*vals[i], lv_color_hex(COL_IVORY), 0);
-        lv_obj_set_style_text_font(*vals[i], &lv_font_montserrat_14, 0);
-        lv_obj_set_width(*vals[i], 64);
+        lv_obj_set_style_text_font(*vals[i], &font_passport_16, 0);
+        lv_obj_set_width(*vals[i], 68);
         lv_label_set_long_mode(*vals[i], LV_LABEL_LONG_CLIP);
         lv_obj_align(*vals[i], LV_ALIGN_TOP_LEFT, 6, 26);
     }
@@ -365,9 +364,9 @@ static void set_today_labels(uint64_t tokens)
     }
     if (s_lbl_today_unit) {
         if (scale[0] != '\0') {
-            lv_label_set_text_fmt(s_lbl_today_unit, "%s TOKENS", scale);
+            lv_label_set_text_fmt(s_lbl_today_unit, "%s Token", scale);
         } else {
-            lv_label_set_text(s_lbl_today_unit, "TOKENS");
+            lv_label_set_text(s_lbl_today_unit, "Token");
         }
     }
 }
@@ -543,6 +542,7 @@ esp_err_t passport_ui_init(void)
     s_lbl_live_meta = lv_label_create(s_live);
     lv_label_set_text(s_lbl_live_meta, "");
     style_micro(s_lbl_live_meta);
+    lv_obj_set_style_text_font(s_lbl_live_meta, &font_passport_16, 0);
     lv_obj_align(s_lbl_live_meta, LV_ALIGN_RIGHT_MID, -10, 0);
 
     lv_obj_t *content = lv_obj_create(col);
@@ -741,7 +741,7 @@ void passport_ui_update_stats(const passport_stats_t *stats)
         }
     }
     if (s_lbl_m_streak) {
-        lv_label_set_text_fmt(s_lbl_m_streak, "%dd", stats->streak_days);
+        lv_label_set_text_fmt(s_lbl_m_streak, "%d天", stats->streak_days);
     }
     if (s_lbl_sync) {
         if (stats->synced_at[0] != '\0') {
