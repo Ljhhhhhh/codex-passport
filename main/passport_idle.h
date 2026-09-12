@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define PASSPORT_IDLE_MS 30000U
+#define PASSPORT_IDLE_MS 15000U
 
 typedef enum {
     PASSPORT_IDLE_NONE = 0,

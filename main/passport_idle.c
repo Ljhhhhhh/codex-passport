@@ -13,18 +13,20 @@ void passport_idle_init(passport_idle_t *idle)
 passport_idle_act_t passport_idle_set_unread(passport_idle_t *idle, uint32_t count)
 {
     if (!idle) return PASSPORT_IDLE_NONE;
-    if (idle->unread_count != count) idle->idle_ms = 0;
-    idle->unread_count = count;
-    if (count && !idle->awake) {
-        idle->awake = 1;
-        return PASSPORT_IDLE_WAKE;
+    if (idle->unread_count != count) {
+        idle->unread_count = count;
+        idle->idle_ms = 0;
+        if (!idle->awake) {
+            idle->awake = 1;
+            return PASSPORT_IDLE_WAKE;
+        }
     }
     return PASSPORT_IDLE_NONE;
 }
 
 passport_idle_act_t passport_idle_on_tick(passport_idle_t *idle, uint32_t dt_ms)
 {
-    if (!idle || !idle->awake || idle->unread_count || dt_ms == 0U) {
+    if (!idle || !idle->awake || dt_ms == 0U) {
         return PASSPORT_IDLE_NONE;
     }
     if (idle->idle_ms >= PASSPORT_IDLE_MS) {
